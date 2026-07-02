@@ -58,6 +58,18 @@ vault/
 ## Íconos UI
 - `src/components/icons.tsx` — set compartido stroke 24x24 (`<Icon.Select/>`, `Icon.Export`, etc.). Usar siempre este set, no SVGs inline nuevos.
 
+## Seguridad (v1.1.0)
+- Media server: token por sesión (`?t=UUID`) obligatorio + chequeo path-traversal con separador; 403 sin token
+- IPC boards: ids validados contra regex UUID estricto (`assertSafeId`) antes de tocar rutas
+- `setWindowOpenHandler` deny + `will-navigate` prevented
+- Sin secretos en código; GH_TOKEN solo por env en publish.sh
+- Electron 43 (vulns runtime resueltas); `uuid` npm eliminado → `crypto.randomUUID`
+- npm audit restante: solo tooling de build (esbuild/vite dev server, tar en electron-builder) — no se distribuye
+
+## Release
+- Repo: `createdbynoone/mynd` (público — requerido para auto-update sin token)
+- `GH_TOKEN=$(gh auth token) bash scripts/publish.sh` — builds arm64+x64, sube dmg/zip/blockmaps/latest-mac.yml
+
 ## Atajos de teclado
 V select · H pan · T título · N nota · F fit · +/- zoom · ⌘E export PDF · ⌘C/⌘V copy/paste · ⌘D duplicar · ⌘A select all · ⌘Z/⇧⌘Z undo/redo
 
