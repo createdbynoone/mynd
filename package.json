@@ -1,0 +1,106 @@
+{
+  "name": "mynd",
+  "version": "1.1.0",
+  "description": "MYND — personal mind maps and moodboards",
+  "main": "out/main/main.js",
+  "type": "module",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build && electron-builder",
+    "build:mac": "electron-vite build && electron-builder --mac",
+    "release": "bash scripts/publish.sh",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [],
+  "author": "Santiago",
+  "license": "MIT",
+  "devDependencies": {
+    "@electron-toolkit/tsconfig": "^2.0.0",
+    "@types/node": "^20.14.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.19",
+    "electron": "^43.0.0",
+    "electron-builder": "^24.13.3",
+    "electron-vite": "^2.3.0",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.4",
+    "typescript": "^5.4.5",
+    "vite": "^5.3.1"
+  },
+  "dependencies": {
+    "@xyflow/react": "^12.3.0",
+    "electron-updater": "^6.8.9",
+    "html-to-image": "^1.11.13",
+    "jspdf": "^4.2.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "build": {
+    "appId": "com.mynd.app",
+    "productName": "MYND",
+    "publish": {
+      "provider": "github",
+      "owner": "createdbynoone",
+      "repo": "mynd",
+      "releaseType": "release"
+    },
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "build/icon.icns",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ]
+    },
+    "dmg": {
+      "background": "build/background.png",
+      "window": {
+        "width": 540,
+        "height": 380
+      },
+      "contents": [
+        {
+          "x": 130,
+          "y": 216,
+          "type": "file"
+        },
+        {
+          "x": 410,
+          "y": 216,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ],
+      "iconSize": 80
+    },
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "out/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "build/icons",
+        "to": "icons",
+        "filter": [
+          "**/*.png"
+        ]
+      }
+    ]
+  }
+}

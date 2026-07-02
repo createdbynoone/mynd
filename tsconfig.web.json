@@ -1,0 +1,12 @@
+{
+  "extends": "@electron-toolkit/tsconfig/tsconfig.web.json",
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/env.d.ts"],
+  "compilerOptions": {
+    "composite": true,
+    "outDir": "out/renderer",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  }
+}

@@ -1,0 +1,176 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body, #root {
+  width: 100%; height: 100%; overflow: hidden;
+  background: #23003F; color: #FFFDB4;
+  font-family: 'Share Tech Mono', 'JetBrains Mono', monospace;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+
+/* ─── React Flow overrides ──────────────────────────────────────────────────── */
+.react-flow {
+  background: inherit;
+}
+
+.react-flow__background {
+  background: inherit;
+}
+
+/* Connection handles */
+.react-flow__handle {
+  width: 14px;
+  height: 14px;
+  background: #310056;
+  border: 2px solid #F94500;
+  border-radius: 50%;
+  opacity: 0;
+  transition: opacity 0.12s, background 0.12s, transform 0.15s;
+  z-index: 10;
+  cursor: crosshair;
+}
+.react-flow__node:hover .react-flow__handle,
+.react-flow__node.selected .react-flow__handle {
+  opacity: 1;
+}
+.react-flow__handle-top    { transform: translate(-50%, -50%) scale(1); }
+.react-flow__handle-right  { transform: translate(50%,  -50%) scale(1); }
+.react-flow__handle-bottom { transform: translate(-50%,  50%) scale(1); }
+.react-flow__handle-left   { transform: translate(-50%, -50%) scale(1); }
+
+.react-flow__handle-top:hover    { transform: translate(-50%, -50%) scale(1.45); }
+.react-flow__handle-right:hover  { transform: translate(50%,  -50%) scale(1.45); }
+.react-flow__handle-bottom:hover { transform: translate(-50%,  50%) scale(1.45); }
+.react-flow__handle-left:hover   { transform: translate(-50%, -50%) scale(1.45); }
+
+.react-flow__handle-connecting {
+  opacity: 1 !important;
+  background: #F94500 !important;
+  box-shadow: 0 0 8px rgba(249, 69, 0, 0.6);
+}
+
+/* Connection line while dragging */
+.react-flow__connectionline {
+  stroke: #F94500;
+  stroke-width: 2;
+  stroke-dasharray: 6 3;
+}
+
+/* Selection box */
+.react-flow__selection {
+  background: rgba(249, 69, 0, 0.04);
+  border: 1px solid rgba(249, 69, 0, 0.35);
+  border-radius: 2px;
+}
+
+/* Node resizer */
+.react-flow__resize-control.handle {
+  width: 8px;
+  height: 8px;
+  background: #F94500;
+  border: 1px solid #23003F;
+  border-radius: 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.react-flow__node.selected .react-flow__resize-control.handle {
+  opacity: 1;
+}
+.react-flow__resize-control.line {
+  border-color: rgba(249, 69, 0, 0.25);
+}
+
+/* Edge */
+.react-flow__edge-path {
+  stroke: #4A1878;
+  stroke-width: 1.5;
+}
+.react-flow__edge.selected .react-flow__edge-path,
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke: #F94500;
+  filter: drop-shadow(0 0 3px rgba(249, 69, 0, 0.4));
+}
+.react-flow__edge-interaction {
+  stroke-width: 20;
+}
+
+/* Controls */
+.react-flow__controls {
+  background: #310056;
+  border: 1px solid #4A1878;
+  border-radius: 4px;
+  box-shadow: none;
+  overflow: hidden;
+}
+.react-flow__controls-button {
+  background: #310056;
+  border: none;
+  border-bottom: 1px solid #4A1878;
+  color: rgba(188,172,206,0.5);
+  width: 28px;
+  height: 28px;
+  transition: color 0.15s, background 0.15s;
+}
+.react-flow__controls-button:last-child { border-bottom: none; }
+.react-flow__controls-button:hover { background: #2A0049; color: #F94500; }
+.react-flow__controls-button svg { fill: currentColor; }
+
+/* Minimap */
+.react-flow__minimap {
+  background: #310056;
+  border: 1px solid #4A1878;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.react-flow__minimap-mask { fill: rgba(35, 0, 63, 0.7); }
+.react-flow__minimap-node { fill: #4A1878; }
+
+/* Attribution */
+.react-flow__attribution { display: none; }
+
+/* ─── Scrollbar ─────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #4A1878; border-radius: 0; }
+::-webkit-scrollbar-thumb:hover { background: rgba(249,69,0,0.2); }
+
+/* ─── Utilities ─────────────────────────────────────────────────────────────── */
+.drag-region { -webkit-app-region: drag; }
+.no-drag { -webkit-app-region: no-drag; }
+
+/* ─── Cyber glow utility ────────────────────────────────────────────────────── */
+.glow-accent {
+  box-shadow: 0 0 8px rgba(249, 69, 0, 0.25);
+}
+.text-glow {
+  text-shadow: 0 0 8px rgba(249, 69, 0, 0.4);
+}
+
+/* ─── Animations ─────────────────────────────────────────────────────────────── */
+@keyframes blink-cursor {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; box-shadow: 0 0 4px rgba(249, 69, 0, 0.8); }
+  50%       { opacity: 0.3; box-shadow: none; }
+}
+@keyframes h-scan {
+  0%   { top: -2px; opacity: 0; }
+  5%   { opacity: 0.6; }
+  95%  { opacity: 0.3; }
+  100% { top: 100%; opacity: 0; }
+}
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-blink     { animation: blink-cursor 1s step-end infinite; }
+.animate-pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }
+.animate-fade-up   { animation: fade-up 0.4s ease-out forwards; }
