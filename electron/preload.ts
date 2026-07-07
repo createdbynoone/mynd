@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 
 const { port: mediaPort, token: mediaToken }: { port: number; token: string } = ipcRenderer.sendSync('media-server-info')
 console.log(`[preload] mediaPort=${mediaPort}`)
@@ -22,6 +22,9 @@ contextBridge.exposeInMainWorld('canvas', {
   },
   files: {
     import:         (path: string)              => ipcRenderer.invoke('files:import', path),
+    importBuffer:   (name: string, data: Uint8Array) => ipcRenderer.invoke('files:import-buffer', { name, data }),
+    // Electron ≥32 eliminó File.path — esta es la única vía para obtener la ruta de un drop
+    pathForFile:    (file: File)                => { try { return webUtils.getPathForFile(file) } catch { return '' } },
     openExternal:   (rel: string)               => ipcRenderer.invoke('files:open-external', rel),
     showInFinder:   (rel: string)               => ipcRenderer.invoke('files:show-in-finder', rel),
     exportPdf:      (fileName: string, data: Uint8Array) => ipcRenderer.invoke('files:export-pdf', { fileName, data }),

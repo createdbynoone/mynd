@@ -515,12 +515,16 @@ function BoardCanvasInner({ boardId, onMetaChange, exportSignal, onExportHandled
     if (!files.length) return
     const basePos = screenToFlowPosition({ x: e.clientX, y: e.clientY })
     const added: Node[] = []
+    let failed = 0
     let offsetX = 0
     for (const file of files) {
-      const path = (file as any).path as string
-      if (!path) continue
       try {
-        const imp = await window.canvas.files.import(path)
+        // Electron ≥32 ya no expone File.path: se resuelve via webUtils en preload.
+        // Archivos sin ruta local (arrastrados desde navegador, etc.) se importan por buffer.
+        const path = window.canvas.files.pathForFile(file)
+        const imp = path
+          ? await window.canvas.files.import(path)
+          : await window.canvas.files.importBuffer(file.name || 'dropped-file', new Uint8Array(await file.arrayBuffer()))
         const url = window.canvas.files.localUrl(imp.relativePath)
         const [w, h] = await getMediaDimensions(imp.nodeType, url)
         added.push({
@@ -531,13 +535,14 @@ function BoardCanvasInner({ boardId, onMetaChange, exportSignal, onExportHandled
           width: w, height: h,
         })
         offsetX += w + 20
-      } catch { /* skip */ }
+      } catch { failed++ }
     }
     if (added.length) {
       setNodes(ns => [...ns, ...added])
       pendingSnapshot.current = true
     }
-  }, [screenToFlowPosition])
+    if (failed > 0) showToast(failed === files.length ? 'IMPORT FAILED' : `${failed} FILE${failed > 1 ? 'S' : ''} FAILED`)
+  }, [screenToFlowPosition, showToast])
 
   const bgVariant = background === 'dots' ? BackgroundVariant.Dots
     : background === 'lines' ? BackgroundVariant.Lines

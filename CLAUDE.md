@@ -27,9 +27,19 @@ npm run build      # producción (electron-builder)
 - `font-mono` (JetBrains Mono) → UI: toolbar, sidebar, labels
 
 ## Electron config (main.ts)
-- `zoomFactor: 1.43` — interfaz al 143%
+- Zoom adaptativo (v1.2.0): `applyAdaptiveZoom` — 1.43 en pantallas ≥1440pt, baja proporcional hasta 1.0 en ventanas angostas (diseño base ~1007px CSS); se aplica en did-finish-load y resize (debounce 120ms)
 - `panOnScroll: true` + `zoomOnScroll: false` — dos dedos = pan, pinch = zoom
 - `backgroundColor: '#23003F'`
+
+## Import de archivos (v1.2.0)
+- Drag & drop: `File.path` NO existe en Electron ≥32 — usar `window.canvas.files.pathForFile(file)` (webUtils en preload); si no hay ruta local (drop desde navegador), fallback `files:import-buffer` (cap 512MB)
+- Formatos imagen: jpg/jpeg/jfif/png/gif/webp/svg/avif/bmp/ico + heic/heif/tif/tiff (estos 4 se convierten a PNG con `sips` al importar porque Chromium no los decodifica)
+- Extensión desconocida → detección por magic bytes (`sniffImageExt`)
+- ImageNode: 2 reintentos automáticos con cache-buster + placeholder "CLICK TO RETRY"
+
+## UI responsive (v1.2.0)
+- Toolbar: ResizeObserver sobre el canvas — oculta labels de sección bajo 900px, `max-w` + overflow-x-auto (`.no-scrollbar`) como último recurso
+- TitleBar: nombre de board centrado con `max-w-[min(220px,24vw)]`
 
 ## Íconos Dock
 - Dev: `applyDockIcon()` en whenReady() carga `build/icons/Icon-macOS-Default-1024@1x.png`
@@ -58,13 +68,21 @@ vault/
 ## Íconos UI
 - `src/components/icons.tsx` — set compartido stroke 24x24 (`<Icon.Select/>`, `Icon.Export`, etc.). Usar siempre este set, no SVGs inline nuevos.
 
-## Seguridad (v1.1.0)
+## Seguridad (v1.1.0 + v1.2.0)
+- v1.2.0: `resolveInVault()` anti-traversal en files:open-external/show-in-finder; Range inválido → 416; import-buffer valida tipo/tamaño y sanitiza nombre
 - Media server: token por sesión (`?t=UUID`) obligatorio + chequeo path-traversal con separador; 403 sin token
 - IPC boards: ids validados contra regex UUID estricto (`assertSafeId`) antes de tocar rutas
 - `setWindowOpenHandler` deny + `will-navigate` prevented
 - Sin secretos en código; GH_TOKEN solo por env en publish.sh
 - Electron 43 (vulns runtime resueltas); `uuid` npm eliminado → `crypto.randomUUID`
 - npm audit restante: solo tooling de build (esbuild/vite dev server, tar en electron-builder) — no se distribuye
+- Media server escucha solo en 127.0.0.1 — no accesible desde otras máquinas/IPs
+
+## Distribución (app sin firmar)
+- Build sin firma de código Apple Developer (`0 valid identities found`) — igual que el resto de apps del usuario
+- DMG descargado desde GitHub queda en cuarentena de macOS → Gatekeeper bloquea apertura a terceros ("no se puede abrir" / "está dañado", mensaje engañoso)
+- Workaround gratis: click derecho → Abrir, o Ajustes → Privacidad y Seguridad → "Abrir de todas formas", o `xattr -cr /Applications/MYND.app`
+- Solución real pendiente: firmar + notarizar con Apple Developer Program ($99/año)
 
 ## Release
 - Repo: `createdbynoone/mynd` (público — requerido para auto-update sin token)

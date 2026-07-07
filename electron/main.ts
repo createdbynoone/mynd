@@ -98,8 +98,10 @@ const ATTACHMENTS_DIR = 'attachments'
 
 // ─── MIME / node-type maps ────────────────────────────────────────────────────
 const MIME: Record<string, string> = {
-  jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
-  gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml',
+  jpg: 'image/jpeg', jpeg: 'image/jpeg', jfif: 'image/jpeg', jpe: 'image/jpeg',
+  png: 'image/png', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml',
+  avif: 'image/avif', bmp: 'image/bmp', ico: 'image/x-icon',
+  tif: 'image/tiff', tiff: 'image/tiff', heic: 'image/heic', heif: 'image/heif',
   mp4: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm',
   mkv: 'video/x-matroska', avi: 'video/x-msvideo',
   pdf: 'application/pdf',
@@ -107,18 +109,46 @@ const MIME: Record<string, string> = {
 }
 const NODE_TYPE_MAP: Record<string, string> = {
   'image/jpeg': 'image', 'image/png': 'image', 'image/gif': 'image',
-  'image/webp': 'image', 'image/svg+xml': 'image',
+  'image/webp': 'image', 'image/svg+xml': 'image', 'image/avif': 'image',
+  'image/bmp': 'image', 'image/x-icon': 'image', 'image/tiff': 'image',
+  'image/heic': 'image', 'image/heif': 'image',
   'video/mp4': 'video', 'video/quicktime': 'video', 'video/webm': 'video',
   'video/x-matroska': 'video', 'video/x-msvideo': 'video',
   'application/pdf': 'pdf',
   'text/plain': 'text', 'text/markdown': 'text',
 }
+// Formatos que Chromium no decodifica — se convierten a PNG al importar
+const CONVERT_TO_PNG = new Set(['heic', 'heif', 'tif', 'tiff'])
 
 function getMime(ext: string): string {
   return MIME[ext.toLowerCase()] ?? 'application/octet-stream'
 }
 function getNodeType(mime: string): string {
   return NODE_TYPE_MAP[mime] ?? 'file'
+}
+
+// Detección por magic bytes: permite importar imágenes con extensión rara o ausente
+function sniffImageExt(buf: Buffer): string | null {
+  if (buf.length < 12) return null
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return 'png'
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'jpg'
+  if (buf.toString('ascii', 0, 4) === 'GIF8') return 'gif'
+  if (buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP') return 'webp'
+  if (buf[0] === 0x42 && buf[1] === 0x4d) return 'bmp'
+  if (buf[0] === 0x00 && buf[1] === 0x00 && buf[2] === 0x01 && buf[3] === 0x00) return 'ico'
+  const tiffLE = buf[0] === 0x49 && buf[1] === 0x49 && buf[2] === 0x2a && buf[3] === 0x00
+  const tiffBE = buf[0] === 0x4d && buf[1] === 0x4d && buf[2] === 0x00 && buf[3] === 0x2a
+  if (tiffLE || tiffBE) return 'tiff'
+  if (buf.toString('ascii', 4, 8) === 'ftyp') {
+    const brand = buf.toString('ascii', 8, 12)
+    if (brand.startsWith('avif') || brand.startsWith('avis')) return 'avif'
+    if (['heic', 'heix', 'hevc', 'heim', 'heis', 'mif1', 'msf1'].includes(brand)) return 'heic'
+    if (['mp41', 'mp42', 'isom', 'M4V '].includes(brand)) return 'mp4'
+    if (brand === 'qt  ') return 'mov'
+  }
+  const head = buf.toString('utf-8', 0, Math.min(buf.length, 512)).trimStart()
+  if (head.startsWith('<') && head.toLowerCase().includes('<svg')) return 'svg'
+  return null
 }
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -197,7 +227,12 @@ function startMediaServer(): Promise<void> {
         if (rangeHeader) {
           const [, s = '0', e = ''] = rangeHeader.match(/bytes=(\d*)-(\d*)/) ?? []
           const start     = parseInt(s, 10) || 0
-          const end       = e ? parseInt(e, 10) : total - 1
+          const end       = Math.min(e ? parseInt(e, 10) : total - 1, total - 1)
+          if (start >= total || start > end) {
+            res.writeHead(416, { ...cors, 'Content-Range': `bytes */${total}` })
+            res.end()
+            return
+          }
           const chunkSize = end - start + 1
           res.writeHead(206, {
             ...cors,
@@ -326,25 +361,49 @@ async function generateVideoThumbnail(videoAbsPath: string, thumbAbsPath: string
   return false
 }
 
-async function importFileToVault(sourcePath: string): Promise<ImportResult> {
-  if (!vaultPath) throw new Error('No vault open')
-  if (!existsSync(sourcePath)) throw new Error('File not found')
+// Convierte formatos no soportados por Chromium (HEIC/TIFF) a PNG con sips (nativo macOS)
+async function convertToPng(buffer: Buffer, hash: string, ext: string): Promise<Buffer | null> {
+  const tmpIn  = join(app.getPath('temp'), `mynd-conv-${hash}.${ext}`)
+  const tmpOut = join(app.getPath('temp'), `mynd-conv-${hash}.png`)
+  try {
+    writeFileSync(tmpIn, buffer)
+    await execFileAsync('sips', ['-s', 'format', 'png', tmpIn, '--out', tmpOut], { timeout: 15000 })
+    if (existsSync(tmpOut)) return readFileSync(tmpOut)
+  } catch { /* sips failed — keep original */ } finally {
+    for (const f of [tmpIn, tmpOut]) { try { if (existsSync(f)) unlinkSync(f) } catch { /* ignore */ } }
+  }
+  return null
+}
 
-  const buffer = readFileSync(sourcePath)
-  const hash   = createHash('sha256').update(buffer).digest('hex').slice(0, 16)
-  const ext    = (sourcePath.split('.').pop() ?? 'bin').toLowerCase()
+async function importBufferToVault(buffer: Buffer, originalName: string): Promise<ImportResult> {
+  if (!vaultPath) throw new Error('No vault open')
+
+  const hash = createHash('sha256').update(buffer).digest('hex').slice(0, 16)
+  let ext = (originalName.includes('.') ? originalName.split('.').pop()! : '').toLowerCase()
+
+  // Extensión desconocida o sin tipo asignado → detectar por contenido
+  if (!ext || !MIME[ext]) {
+    const sniffed = sniffImageExt(buffer)
+    if (sniffed) ext = sniffed
+    else if (!ext) ext = 'bin'
+  }
+
+  // Formatos de imagen que el renderer no puede decodificar → PNG
+  if (CONVERT_TO_PNG.has(ext)) {
+    const png = await convertToPng(buffer, hash, ext)
+    if (png) { buffer = png; ext = 'png' }
+  }
+
   const stored = `${hash}.${ext}`
   const dest   = join(vaultPath, ATTACHMENTS_DIR, stored)
-
   if (!existsSync(dest)) writeFileSync(dest, buffer)
 
-  const originalName = sourcePath.split('/').pop() ?? stored
-  const mimeType     = getMime(ext)
-  const nodeType     = getNodeType(mimeType)
+  const mimeType = getMime(ext)
+  const nodeType = getNodeType(mimeType)
 
   const result: ImportResult = {
     relativePath: `${ATTACHMENTS_DIR}/${stored}`,
-    fileName: originalName,
+    fileName: originalName || stored,
     mimeType,
     fileSize: buffer.length,
     nodeType,
@@ -362,6 +421,13 @@ async function importFileToVault(sourcePath: string): Promise<ImportResult> {
   }
 
   return result
+}
+
+async function importFileToVault(sourcePath: string): Promise<ImportResult> {
+  if (!existsSync(sourcePath)) throw new Error('File not found')
+  const buffer = readFileSync(sourcePath)
+  const originalName = sourcePath.split('/').pop() ?? 'file'
+  return importBufferToVault(buffer, originalName)
 }
 
 // ─── Auto-update ─────────────────────────────────────────────────────────────
@@ -453,6 +519,18 @@ function setupAutoUpdater(): void {
 }
 
 // ─── Window ───────────────────────────────────────────────────────────────────
+// La UI está diseñada para ~1007px CSS (1440pt @ 1.43). En pantallas/ventanas más
+// angostas el zoom baja proporcionalmente para que nada quede cortado.
+const DESIGN_CSS_WIDTH = 1007
+const MAX_ZOOM = 1.43
+const MIN_ZOOM = 1.0
+
+function applyAdaptiveZoom(win: BrowserWindow): void {
+  const { width } = win.getContentBounds()
+  const zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, width / DESIGN_CSS_WIDTH))
+  win.webContents.setZoomFactor(zoom)
+}
+
 function createWindow(): void {
   const prefs = loadPrefs()
   const b = prefs.windowBounds
@@ -478,6 +556,15 @@ function createWindow(): void {
     if (!mainWindow) return
     const bounds = mainWindow.getBounds()
     savePrefs({ ...loadPrefs(), windowBounds: bounds })
+  })
+
+  let zoomTimer: ReturnType<typeof setTimeout> | null = null
+  mainWindow.on('resize', () => {
+    if (zoomTimer) clearTimeout(zoomTimer)
+    zoomTimer = setTimeout(() => { if (mainWindow) applyAdaptiveZoom(mainWindow) }, 120)
+  })
+  mainWindow.webContents.on('did-finish-load', () => {
+    if (mainWindow) applyAdaptiveZoom(mainWindow)
   })
 
   mainWindow.webContents.on('will-navigate', e => e.preventDefault())
@@ -632,19 +719,34 @@ ipcMain.handle('boards:set-last', (_e, id: string) => {
 })
 
 // ─── IPC — Files ──────────────────────────────────────────────────────────────
+const MAX_IMPORT_BYTES = 512 * 1024 * 1024 // 512 MB
+
+// Resuelve una ruta relativa dentro del vault; rechaza traversal fuera de él
+function resolveInVault(relativePath: unknown): string {
+  if (!vaultPath || typeof relativePath !== 'string') throw new Error('Invalid')
+  const abs = join(vaultPath, relativePath)
+  if (relativePath.includes('..') || !abs.startsWith(vaultPath + sep)) throw new Error('Invalid path')
+  return abs
+}
+
 ipcMain.handle('files:import', async (_e, sourcePath: string) => {
   if (typeof sourcePath !== 'string' || sourcePath.includes('..')) throw new Error('Invalid path')
   return importFileToVault(sourcePath)
 })
 
+ipcMain.handle('files:import-buffer', async (_e, { name, data }: { name: string; data: Uint8Array }) => {
+  if (typeof name !== 'string' || !(data instanceof Uint8Array)) throw new Error('Invalid')
+  if (data.byteLength === 0 || data.byteLength > MAX_IMPORT_BYTES) throw new Error('File too large')
+  const safeName = name.replace(/[/\\]/g, '-').slice(0, 255)
+  return importBufferToVault(Buffer.from(data), safeName)
+})
+
 ipcMain.handle('files:open-external', (_e, relativePath: string) => {
-  if (!vaultPath || typeof relativePath !== 'string') throw new Error('Invalid')
-  return shell.openPath(join(vaultPath, relativePath))
+  return shell.openPath(resolveInVault(relativePath))
 })
 
 ipcMain.handle('files:show-in-finder', (_e, relativePath: string) => {
-  if (!vaultPath || typeof relativePath !== 'string') throw new Error('Invalid')
-  shell.showItemInFolder(join(vaultPath, relativePath))
+  shell.showItemInFolder(resolveInVault(relativePath))
 })
 
 ipcMain.handle('files:export-pdf', async (_e, { fileName, data }: { fileName: string; data: Uint8Array }) => {

@@ -120,6 +120,8 @@ export interface CanvasAPI {
   }
   files: {
     import(path: string): Promise<ImportResult>
+    importBuffer(name: string, data: Uint8Array): Promise<ImportResult>
+    pathForFile(file: File): string
     openExternal(rel: string): Promise<void>
     showInFinder(rel: string): Promise<void>
     exportPdf(fileName: string, data: Uint8Array): Promise<{ saved: boolean; path?: string }>

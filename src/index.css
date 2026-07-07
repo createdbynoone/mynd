@@ -174,3 +174,7 @@ html, body, #root {
 .animate-blink     { animation: blink-cursor 1s step-end infinite; }
 .animate-pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }
 .animate-fade-up   { animation: fade-up 0.4s ease-out forwards; }
+
+/* Oculta la barra de scroll (la toolbar compacta scrollea sin mostrarla) */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }

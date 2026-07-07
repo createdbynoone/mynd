@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import type { BackgroundType } from '../types'
 import { Icon } from './icons'
 
@@ -43,13 +44,27 @@ export default function Toolbar({
   zoom, onZoomIn, onZoomOut, onZoomFit,
   onExportPdf, exporting,
 }: Props) {
+  // Se adapta al ancho real del canvas: en espacios angostos oculta los labels
+  // de sección para que la barra nunca quede cortada.
+  const barRef = useRef<HTMLDivElement>(null)
+  const [canvasW, setCanvasW] = useState(Number.MAX_SAFE_INTEGER)
+  useEffect(() => {
+    const parent = barRef.current?.parentElement
+    if (!parent) return
+    const ro = new ResizeObserver(entries => setCanvasW(entries[0].contentRect.width))
+    ro.observe(parent)
+    return () => ro.disconnect()
+  }, [])
+  const compact = canvasW < 900
+
   return (
     <div
-      className="absolute top-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-0.5 bg-surface border border-border px-2 py-1.5 no-drag"
+      ref={barRef}
+      className="absolute top-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-0.5 bg-surface border border-border px-2 py-1.5 no-drag max-w-[calc(100%-88px)] overflow-x-auto no-scrollbar [&>*]:flex-none"
       style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.6), 0 0 1px rgba(249,69,0,0.12)' }}
     >
       {/* [ TOOL ] */}
-      <Label>TOOL</Label>
+      {!compact && <Label>TOOL</Label>}
       <ToolBtn active={tool === 'select'} onClick={() => onToolChange('select')} title="Select (V)">
         <Icon.Select size={13} color={tool === 'select' ? '#F94500' : undefined} />
       </ToolBtn>
@@ -60,7 +75,7 @@ export default function Toolbar({
       <Divider />
 
       {/* [ ADD ] */}
-      <Label>ADD</Label>
+      {!compact && <Label>ADD</Label>}
       <ToolBtn onClick={onAddTitle} title="Add Title (T)">
         <Icon.Title size={13} />
       </ToolBtn>
@@ -74,7 +89,7 @@ export default function Toolbar({
       <Divider />
 
       {/* [ GRID ] */}
-      <Label>GRID</Label>
+      {!compact && <Label>GRID</Label>}
       <div className="flex gap-0.5">
         {BG_OPTIONS.map(opt => (
           <button
@@ -95,7 +110,7 @@ export default function Toolbar({
       <Divider />
 
       {/* [ BG ] canvas color */}
-      <Label>BG</Label>
+      {!compact && <Label>BG</Label>}
       <div className="flex items-center gap-1">
         {CANVAS_BG_PRESETS.map(p => (
           <button
@@ -125,7 +140,7 @@ export default function Toolbar({
       <Divider />
 
       {/* [ ZOOM ] */}
-      <Label>ZOOM</Label>
+      {!compact && <Label>ZOOM</Label>}
       <ToolBtn onClick={onZoomOut} title="Zoom out (-)">
         <Icon.ZoomOut size={11} />
       </ToolBtn>
@@ -143,7 +158,7 @@ export default function Toolbar({
       <Divider />
 
       {/* [ EXPORT ] */}
-      <Label>EXPORT</Label>
+      {!compact && <Label>EXPORT</Label>}
       <button
         onClick={onExportPdf}
         disabled={exporting}

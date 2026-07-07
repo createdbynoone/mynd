@@ -31,7 +31,7 @@ export default function TitleBar({ vaultName, boardName, nodeCount }: Props) {
       {boardName && (
         <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2 pointer-events-none">
           <span className="font-mono text-[10px] text-text-primary/40 select-none">//</span>
-          <span className="font-mono text-[11px] text-text-primary tracking-[0.12em] uppercase truncate max-w-[220px]">
+          <span className="font-mono text-[11px] text-text-primary tracking-[0.12em] uppercase truncate max-w-[min(220px,24vw)]">
             {boardName}
           </span>
         </div>
